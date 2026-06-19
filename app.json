@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "Video Menu",
+    "slug": "video-menu",
+    "version": "0.1.0",
+    "orientation": "landscape",
+    "scheme": "videomenu",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "android": {
+      "package": "com.ivan.videomenu",
+      "versionCode": 1
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": [
+      "expo-router"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
