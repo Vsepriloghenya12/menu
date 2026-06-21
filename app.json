@@ -6,7 +6,6 @@
     "orientation": "landscape",
     "scheme": "videomenu",
     "userInterfaceStyle": "dark",
-    "newArchEnabled": true,
     "android": {
       "package": "com.ivan.videomenu",
       "versionCode": 1
@@ -20,6 +19,13 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "c1a26167-0315-4b9f-8b27-c902d24ed88f"
+      }
+    },
+    "owner": "realone14"
   }
 }

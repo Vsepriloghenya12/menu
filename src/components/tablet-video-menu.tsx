@@ -1,10 +1,10 @@
-import { categories, dishes } from "@/data/menu";
-import { cartReducer, getCartTotal, getLineTotal, initialCartState } from "@/state/cart";
-import { CartLine, Dish } from "@/types/menu";
+import DishModelViewer from "@/components/dish-model-viewer";
+import { useMenu } from "@/hooks/use-menu";
+import { Dish } from "@/types/menu";
 import { formatMoney } from "@/utils/money";
 import { VideoView, useVideoPlayer } from "expo-video";
-import { Info, ShoppingCart, Sparkles } from "lucide-react-native";
-import { useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { Box, Info, Sparkles, X } from "lucide-react-native";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   FlatList,
   Modal,
@@ -43,28 +43,31 @@ function DishVideo({ dish, active }: { dish: Dish; active: boolean }) {
 }
 
 export function TabletVideoMenu() {
+  const { categories, dishes } = useMenu();
   const { width, height } = useWindowDimensions();
-  const [state, dispatch] = useReducer(cartReducer, initialCartState);
-  const [categoryId, setCategoryId] = useState(categories[0].id);
-  const [activeDishId, setActiveDishId] = useState(dishes[0].id);
+  const [categoryId, setCategoryId] = useState(categories[0]?.id ?? "");
+  const [activeDishId, setActiveDishId] = useState(dishes[0]?.id ?? "");
   const [detailsDish, setDetailsDish] = useState<Dish | null>(null);
   const [pairingDish, setPairingDish] = useState<Dish | null>(null);
-  const [cartVisible, setCartVisible] = useState(false);
-  const [lastLineId, setLastLineId] = useState<string | null>(null);
+  const [modelDish, setModelDish] = useState<Dish | null>(null);
   const listRef = useRef<FlatList<Dish>>(null);
 
   const visibleDishes = useMemo(
     () => dishes.filter((dish) => dish.categoryId === categoryId),
     [categoryId],
   );
-  const lastLine = state.lines.find((line) => line.id === lastLineId);
+  useEffect(() => {
+    if (!categories.some((category) => category.id === categoryId)) {
+      setCategoryId(categories[0]?.id ?? "");
+    }
+  }, [categories, categoryId]);
 
   useEffect(() => {
-    const newest = state.lines[state.lines.length - 1];
-    if (newest) {
-      setLastLineId(newest.id);
+    if (!dishes.some((dish) => dish.id === activeDishId)) {
+      const firstDish = dishes.find((dish) => dish.categoryId === categoryId) ?? dishes[0];
+      setActiveDishId(firstDish?.id ?? "");
     }
-  }, [state.lines]);
+  }, [activeDishId, categoryId, dishes]);
 
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: ViewToken<Dish>[] }) => {
@@ -84,8 +87,13 @@ export function TabletVideoMenu() {
     listRef.current?.scrollToOffset({ offset: 0, animated: false });
   }
 
-  function addDish(dish: Dish) {
-    dispatch({ type: "addDish", dish });
+  if (dishes.length === 0) {
+    return (
+      <View style={styles.emptyMenu}>
+        <Text style={styles.emptyMenuTitle}>Меню пока пусто</Text>
+        <Text style={styles.emptyMenuText}>Добавьте блюда на странице владельца.</Text>
+      </View>
+    );
   }
 
   function chooseDish(dish: Dish) {
@@ -163,12 +171,6 @@ export function TabletVideoMenu() {
             </View>
 
             <View style={styles.actionDock}>
-              <Pressable accessibilityRole="button" onPress={() => addDish(item)} style={styles.primaryButton}>
-                <View style={[styles.iconBadge, styles.primaryIconBadge]}>
-                  <ShoppingCart color="#ffffff" size={18} strokeWidth={2.6} />
-                </View>
-                <Text style={styles.primaryButtonText}>В корзину</Text>
-              </Pressable>
               <Pressable accessibilityRole="button" onPress={() => setDetailsDish(item)} style={styles.secondaryButton}>
                 <View style={styles.iconBadge}>
                   <Info color="#ffffff" size={18} strokeWidth={2.5} />
@@ -181,65 +183,23 @@ export function TabletVideoMenu() {
                 </View>
                 <Text style={styles.secondaryButtonText}>Подойдет</Text>
               </Pressable>
+              {item.id === "bruschetta" ? (
+                <Pressable accessibilityRole="button" onPress={() => setModelDish(item)} style={styles.modelButton}>
+                  <View style={styles.iconBadge}>
+                    <Box color="#151515" size={18} strokeWidth={2.4} />
+                  </View>
+                  <Text style={styles.modelButtonText}>Смотреть в 3D</Text>
+                </Pressable>
+              ) : null}
             </View>
 
-            <Pressable accessibilityRole="button" onPress={() => setCartVisible(true)} style={styles.cartButton}>
-              <View style={styles.cartIconBadge}>
-                <ShoppingCart color="#ffffff" size={18} strokeWidth={2.5} />
-              </View>
-              <Text style={styles.cartButtonText}>Корзина</Text>
-              <Text style={styles.cartCount}>{state.lines.length}</Text>
-            </Pressable>
           </View>
         )}
       />
 
-      {lastLine ? (
-        <View style={styles.addOnsBar}>
-          <View style={styles.addOnsHeader}>
-            <View>
-              <Text style={styles.addOnsLabel}>Дополнить блюдо</Text>
-              <Text style={styles.addOnsTitle}>{lastLine.dish.title}</Text>
-            </View>
-            <Pressable accessibilityRole="button" onPress={() => setLastLineId(null)} style={styles.addOnsClose}>
-              <Text style={styles.addOnsCloseText}>Закрыть</Text>
-            </Pressable>
-          </View>
-          <View style={styles.addOnsBody}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.addOnsList}>
-              {lastLine.dish.addOns.map((addOn) => {
-                const selected = lastLine.selectedAddOns.some((item) => item.id === addOn.id);
-                return (
-                  <Pressable
-                    accessibilityRole="checkbox"
-                    accessibilityState={{ checked: selected }}
-                    key={addOn.id}
-                    onPress={() => dispatch({ type: "toggleAddOn", lineId: lastLine.id, addOn })}
-                    style={[styles.addOnChip, selected && styles.addOnChipActive]}
-                  >
-                    <Text style={styles.addOnChipText}>{addOn.title}</Text>
-                    <Text style={styles.addOnChipPrice}>{formatMoney(addOn.price)}</Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-          </View>
-        </View>
-      ) : null}
-
       <DishDetails dish={detailsDish} onClose={() => setDetailsDish(null)} />
       <PairingsModal dish={pairingDish} onClose={() => setPairingDish(null)} />
-      <CartModal
-        visible={cartVisible}
-        lines={state.lines}
-        onClose={() => setCartVisible(false)}
-        onQuantity={(lineId, delta) => dispatch({ type: "changeQuantity", lineId, delta })}
-        onSubmit={() => {
-          dispatch({ type: "submitOrder", table: "Стол планшета" });
-          setCartVisible(false);
-          setLastLineId(null);
-        }}
-      />
+      <ModelViewerModal dish={modelDish} onClose={() => setModelDish(null)} />
     </View>
   );
 }
@@ -288,61 +248,26 @@ function PairingsModal({ dish, onClose }: { dish: Dish | null; onClose: () => vo
   );
 }
 
-function CartModal({
-  visible,
-  lines,
-  onClose,
-  onQuantity,
-  onSubmit,
-}: {
-  visible: boolean;
-  lines: CartLine[];
-  onClose: () => void;
-  onQuantity: (lineId: string, delta: number) => void;
-  onSubmit: () => void;
-}) {
+function ModelViewerModal({ dish, onClose }: { dish: Dish | null; onClose: () => void }) {
   return (
-    <Modal animationType="slide" transparent visible={visible} onRequestClose={onClose}>
-      <View style={styles.cartBackdrop}>
-        <View style={styles.cartPanel}>
-          <Text style={styles.modalTitle}>Корзина</Text>
-          <ScrollView contentContainerStyle={styles.cartList}>
-            {lines.length === 0 ? (
-              <Text style={styles.modalText}>Пока пусто</Text>
-            ) : (
-              lines.map((line) => (
-                <View key={line.id} style={styles.cartLine}>
-                  <View style={styles.cartLineMain}>
-                    <Text style={styles.cartLineTitle}>{line.dish.title}</Text>
-                    <Text style={styles.cartLineSub}>
-                      {line.selectedAddOns.length > 0
-                        ? line.selectedAddOns.map((addOn) => addOn.title).join(", ")
-                        : "Без допов"}
-                    </Text>
-                    <Text style={styles.cartLinePrice}>{formatMoney(getLineTotal(line))}</Text>
-                  </View>
-                  <View style={styles.qtyControls}>
-                    <Pressable accessibilityRole="button" onPress={() => onQuantity(line.id, -1)} style={styles.qtyButton}>
-                      <Text style={styles.qtyText}>-</Text>
-                    </Pressable>
-                    <Text style={styles.qtyValue}>{line.quantity}</Text>
-                    <Pressable accessibilityRole="button" onPress={() => onQuantity(line.id, 1)} style={styles.qtyButton}>
-                      <Text style={styles.qtyText}>+</Text>
-                    </Pressable>
-                  </View>
-                </View>
-              ))
-            )}
-          </ScrollView>
-          <Text style={styles.total}>Итого: {formatMoney(getCartTotal(lines))}</Text>
-          <View style={styles.cartActions}>
-            <Pressable accessibilityRole="button" onPress={onClose} style={styles.secondaryButton}>
-              <Text style={styles.secondaryButtonText}>Назад</Text>
-            </Pressable>
-            <Pressable accessibilityRole="button" disabled={lines.length === 0} onPress={onSubmit} style={styles.primaryButton}>
-              <Text style={styles.primaryButtonText}>Отправить заказ</Text>
-            </Pressable>
+    <Modal animationType="fade" visible={Boolean(dish)} onRequestClose={onClose}>
+      <View style={styles.modelViewerShell}>
+        <DishModelViewer
+          dom={{
+            contentInsetAdjustmentBehavior: "never",
+            scrollEnabled: false,
+            style: { width: "100%", height: "100%" },
+          }}
+        />
+        <View style={styles.modelViewerHeader}>
+          <View>
+            <Text style={styles.modelViewerEyebrow}>Демонстрация 3D</Text>
+            <Text style={styles.modelViewerTitle}>{dish?.title}</Text>
           </View>
+          <Pressable accessibilityLabel="Закрыть 3D-просмотр" accessibilityRole="button" onPress={onClose} style={styles.modelCloseButton}>
+            <X color="#ffffff" size={22} strokeWidth={2.5} />
+            <Text style={styles.modelCloseText}>Закрыть</Text>
+          </Pressable>
         </View>
       </View>
     </Modal>
@@ -351,6 +276,15 @@ function CartModal({
 
 const styles = StyleSheet.create({
   shell: { flex: 1, backgroundColor: "#05080d" },
+  emptyMenu: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "#05080d",
+  },
+  emptyMenuTitle: { color: "#ffffff", fontSize: 28, fontWeight: "900" },
+  emptyMenuText: { color: "#9fb0c0", fontSize: 16 },
   slide: { backgroundColor: "#05080d" },
   scrim: {
     position: "absolute",
@@ -364,7 +298,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 26,
     left: 30,
-    right: 180,
+    right: 30,
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 10,
@@ -384,7 +318,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 82,
     left: 30,
-    right: 210,
+    right: 30,
   },
   dishRailContent: { gap: 10, paddingRight: 12 },
   dishButton: {
@@ -437,17 +371,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.14)",
   },
-  primaryButton: {
-    minHeight: 58,
-    borderRadius: 8,
-    paddingHorizontal: 18,
-    flexDirection: "row",
-    gap: 10,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#2f8f5b",
-  },
-  primaryButtonText: { color: "#ffffff", fontSize: 18, fontWeight: "900" },
   secondaryButton: {
     minHeight: 52,
     borderRadius: 8,
@@ -461,6 +384,17 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.18)",
   },
   secondaryButtonText: { color: "#ffffff", fontSize: 16, fontWeight: "800" },
+  modelButton: {
+    minHeight: 52,
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    gap: 10,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#f2c14e",
+  },
+  modelButtonText: { color: "#151515", fontSize: 16, fontWeight: "900" },
   iconBadge: {
     width: 30,
     height: 30,
@@ -469,84 +403,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "rgba(255,255,255,0.15)",
   },
-  primaryIconBadge: {
-    backgroundColor: "rgba(255,255,255,0.2)",
-  },
-  cartButton: {
-    position: "absolute",
-    top: 26,
-    right: 30,
-    minHeight: 54,
-    minWidth: 156,
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    flexDirection: "row",
-    gap: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(10,15,24,0.76)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.24)",
-  },
-  cartIconBadge: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.14)",
-  },
-  cartButtonText: { color: "#ffffff", fontSize: 16, fontWeight: "800" },
-  cartCount: {
-    color: "#111111",
-    backgroundColor: "#f2c14e",
-    minWidth: 28,
-    borderRadius: 14,
-    overflow: "hidden",
-    textAlign: "center",
-    fontWeight: "900",
-  },
-  addOnsBar: {
-    position: "absolute",
-    left: 30,
-    right: 30,
-    bottom: 18,
-    borderRadius: 8,
-    padding: 14,
-    gap: 12,
-    backgroundColor: "rgba(12,18,27,0.94)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.18)",
-  },
-  addOnsHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 16 },
-  addOnsBody: { minHeight: 58, justifyContent: "center" },
-  addOnsLabel: { color: "#9fb0c0", fontSize: 12, fontWeight: "900", textTransform: "uppercase" },
-  addOnsTitle: { color: "#ffffff", fontSize: 17, fontWeight: "900" },
-  addOnsClose: {
-    minHeight: 42,
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.12)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.18)",
-  },
-  addOnsCloseText: { color: "#ffffff", fontSize: 14, fontWeight: "900" },
-  addOnsList: { gap: 10 },
-  addOnChip: {
-    borderRadius: 8,
-    minWidth: 180,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-    gap: 4,
-    backgroundColor: "rgba(255,255,255,0.12)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
-  },
-  addOnChipActive: { backgroundColor: "#2f8f5b", borderColor: "#42b574" },
-  addOnChipText: { color: "#ffffff", fontSize: 15, fontWeight: "800" },
-  addOnChipPrice: { color: "#d6e0ea", fontSize: 13, fontWeight: "800" },
   modalBackdrop: {
     flex: 1,
     alignItems: "center",
@@ -575,43 +431,31 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   closeButtonText: { color: "#151515", fontSize: 16, fontWeight: "900" },
-  cartBackdrop: {
-    flex: 1,
-    alignItems: "flex-end",
-    backgroundColor: "rgba(0,0,0,0.48)",
-  },
-  cartPanel: {
-    width: "94%",
-    maxWidth: 520,
-    height: "100%",
-    padding: 22,
-    gap: 16,
-    backgroundColor: "#111820",
-  },
-  cartList: { gap: 12 },
-  cartLine: {
-    borderRadius: 8,
-    padding: 14,
-    gap: 12,
-    backgroundColor: "#18222d",
+  modelViewerShell: { flex: 1, backgroundColor: "#05080d" },
+  modelViewerHeader: {
+    position: "absolute",
+    top: 22,
+    left: 24,
+    right: 24,
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
+    gap: 20,
+    pointerEvents: "box-none",
   },
-  cartLineMain: { flex: 1, gap: 4 },
-  cartLineTitle: { color: "#ffffff", fontSize: 17, fontWeight: "800" },
-  cartLineSub: { color: "#9fb0c0", fontSize: 13 },
-  cartLinePrice: { color: "#f2c14e", fontSize: 16, fontWeight: "900" },
-  qtyControls: { flexDirection: "row", alignItems: "center", gap: 8 },
-  qtyButton: {
-    width: 38,
-    height: 38,
+  modelViewerEyebrow: { color: "#b7c3cf", fontSize: 12, fontWeight: "900", textTransform: "uppercase" },
+  modelViewerTitle: { color: "#ffffff", fontSize: 26, fontWeight: "900" },
+  modelCloseButton: {
+    minHeight: 48,
     borderRadius: 8,
+    paddingHorizontal: 16,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.12)",
+    gap: 8,
+    backgroundColor: "rgba(5,8,13,0.82)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
   },
-  qtyText: { color: "#ffffff", fontSize: 24, fontWeight: "900" },
-  qtyValue: { color: "#ffffff", minWidth: 24, textAlign: "center", fontSize: 18, fontWeight: "900" },
-  total: { color: "#ffffff", fontSize: 22, fontWeight: "900" },
-  cartActions: { flexDirection: "row", gap: 12 },
+  modelCloseText: { color: "#ffffff", fontSize: 15, fontWeight: "900" },
 });
