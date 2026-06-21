@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node server/index.cjs",
     "server": "node server/index.cjs",
+    "seed:demo": "node server/seed-demo.cjs",
     "build": "expo export --platform web",
     "test": "node --test server/test/menu-api.test.cjs",
     "android": "expo start --android",

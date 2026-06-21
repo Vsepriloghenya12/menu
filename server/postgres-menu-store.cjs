@@ -81,6 +81,14 @@ function createPostgresMenuStore({ connectionString, seed, pool }) {
       const row = result.rows[0];
       return { categories: row.categories, dishes: row.dishes, addOnCatalog: row.add_ons };
     },
+    async replaceMenu(nextMenu) {
+      return mutate((menu) => {
+        menu.categories = nextMenu.categories;
+        menu.dishes = nextMenu.dishes;
+        menu.addOnCatalog = nextMenu.addOnCatalog;
+        return { changed: true, result: nextMenu };
+      });
+    },
     async createAddOn(addOn) {
       return mutate((menu) => {
         menu.addOnCatalog.push(addOn);

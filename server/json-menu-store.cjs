@@ -39,6 +39,10 @@ function createJsonMenuStore({ filePath, seed }) {
     async getMenu() {
       return readMenu();
     },
+    async replaceMenu(nextMenu) {
+      await writeMenu(nextMenu);
+      return nextMenu;
+    },
     async createCategory(category) {
       const menu = await readMenu();
       menu.categories.push(category);

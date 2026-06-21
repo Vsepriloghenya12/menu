@@ -77,6 +77,25 @@ test("GET /api/menu does not expose a Допы category", async () => {
   });
 });
 
+test("JSON store can replace the complete menu", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "video-menu-replace-"));
+  const filePath = path.join(directory, "menu.json");
+  const store = createJsonMenuStore({ filePath, seed });
+  const nextMenu = {
+    categories: [{ id: "desserts", title: "Десерты" }],
+    addOnCatalog: [],
+    dishes: [],
+  };
+
+  try {
+    await store.replaceMenu(nextMenu);
+    assert.deepEqual(JSON.parse(await readFile(filePath, "utf8")), nextMenu);
+    assert.deepEqual(await store.getMenu(), nextMenu);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("PATCH /api/admin/dishes/:id persists a complete valid dish", async () => {
   await withServer(async ({ baseUrl, filePath }) => {
     const changedDish = { ...seed.dishes[0], title: "Паста с креветками", price: 890 };

@@ -3,7 +3,7 @@
     "name": "Video Menu",
     "slug": "video-menu",
     "version": "0.1.0",
-    "orientation": "landscape",
+    "orientation": "default",
     "scheme": "videomenu",
     "userInterfaceStyle": "dark",
     "android": {
