@@ -9,7 +9,7 @@
     "seed:demo": "node server/seed-demo.cjs",
     "build": "expo export --platform web",
     "test": "node --test server/test",
-    "android": "expo start --android",
+    "android": "expo run:android",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "export:web": "expo export --platform web"
