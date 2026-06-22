@@ -59,3 +59,10 @@ test("3D viewer renders with Three.js and rotates automatically", async () => {
   assert.match(source, /fitDistance/);
   assert.doesNotMatch(source, /React\.createElement\("model-viewer"/);
 });
+
+test("Android 3D viewer uses the standard hardware-accelerated WebView", async () => {
+  const source = await readProjectFile("src/components/tablet-video-menu.tsx");
+
+  assert.match(source, /useExpoDOMWebView:\s*false/);
+  assert.match(source, /androidLayerType:\s*"hardware"/);
+});

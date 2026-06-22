@@ -355,12 +355,14 @@ function ModelViewerModal({ dish, onClose }: { dish: Dish | null; onClose: () =>
     <Modal animationType="fade" visible={Boolean(dish)} onRequestClose={onClose}>
       <View style={styles.modelViewerShell}>
         {dish && hasDishModel(dish.id) ? (
-          <DishModelViewer
-            dishId={dish.id}
-            dom={{
-              contentInsetAdjustmentBehavior: "never",
-              scrollEnabled: false,
-              style: { width: "100%", height: "100%" },
+            <DishModelViewer
+              dishId={dish.id}
+              dom={{
+                useExpoDOMWebView: false,
+                androidLayerType: "hardware",
+                contentInsetAdjustmentBehavior: "never",
+                scrollEnabled: false,
+                style: { width: "100%", height: "100%" },
             }}
           />
         ) : null}
