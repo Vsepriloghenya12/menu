@@ -1,4 +1,5 @@
 import DishModelViewer from "@/components/dish-model-viewer";
+import { hasDishModel } from "@/data/dish-models";
 import { useMenu } from "@/hooks/use-menu";
 import { Dish } from "@/types/menu";
 import { formatMoney } from "@/utils/money";
@@ -14,7 +15,6 @@ import {
   Text,
   useWindowDimensions,
   View,
-  ViewToken,
 } from "react-native";
 
 function DishVideo({ dish, active }: { dish: Dish; active: boolean }) {
@@ -42,6 +42,15 @@ function DishVideo({ dish, active }: { dish: Dish; active: boolean }) {
   );
 }
 
+function DishVideoPage({ dish, active, width, height }: { dish: Dish; active: boolean; width: number; height: number }) {
+  return (
+    <View style={[styles.slide, { width, height }]}>
+      <DishVideo dish={dish} active={active} />
+      <View style={styles.scrim} />
+    </View>
+  );
+}
+
 export function TabletVideoMenu() {
   const { categories, dishes } = useMenu();
   const { width, height } = useWindowDimensions();
@@ -60,11 +69,13 @@ export function TabletVideoMenu() {
   const [pairingDish, setPairingDish] = useState<Dish | null>(null);
   const [modelDish, setModelDish] = useState<Dish | null>(null);
   const listRef = useRef<FlatList<Dish>>(null);
+  const activeIndexRef = useRef(0);
 
   const visibleDishes = useMemo(
     () => dishes.filter((dish) => dish.categoryId === categoryId),
     [categoryId, dishes],
   );
+  const activeDish = visibleDishes.find((dish) => dish.id === activeDishId) ?? visibleDishes[0];
   useEffect(() => {
     if (!categories.some((category) => category.id === categoryId)) {
       setCategoryId(categories[0]?.id ?? "");
@@ -79,22 +90,8 @@ export function TabletVideoMenu() {
   }, [activeDishId, categoryId, dishes]);
 
   useEffect(() => {
-    const activeIndex = visibleDishes.findIndex((dish) => dish.id === activeDishId);
-    if (activeIndex >= 0) {
-      setTimeout(() => {
-        listRef.current?.scrollToIndex({ index: activeIndex, animated: false });
-      }, 0);
-    }
-  }, [activeDishId, visibleDishes, width]);
-
-  const onViewableItemsChanged = useRef(
-    ({ viewableItems }: { viewableItems: ViewToken<Dish>[] }) => {
-      const firstVisible = viewableItems[0]?.item;
-      if (firstVisible) {
-        setActiveDishId(firstVisible.id);
-      }
-    },
-  ).current;
+    listRef.current?.scrollToIndex({ index: activeIndexRef.current, animated: false });
+  }, [width]);
 
   function chooseCategory(nextCategoryId: string) {
     setCategoryId(nextCategoryId);
@@ -102,6 +99,7 @@ export function TabletVideoMenu() {
     if (firstDish) {
       setActiveDishId(firstDish.id);
     }
+    activeIndexRef.current = 0;
     listRef.current?.scrollToOffset({ offset: 0, animated: false });
   }
 
@@ -121,6 +119,7 @@ export function TabletVideoMenu() {
     }
 
     setActiveDishId(dish.id);
+    activeIndexRef.current = index;
     listRef.current?.scrollToIndex({ index, animated: true });
   }
 
@@ -133,167 +132,161 @@ export function TabletVideoMenu() {
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
-        onViewableItemsChanged={onViewableItemsChanged}
-        viewabilityConfig={{ itemVisiblePercentThreshold: 70 }}
+        onMomentumScrollEnd={(event) => {
+          const index = Math.round(event.nativeEvent.contentOffset.x / width);
+          const dish = visibleDishes[index];
+          if (dish) {
+            activeIndexRef.current = index;
+            setActiveDishId(dish.id);
+          }
+        }}
         getItemLayout={(_, index) => ({ length: width, offset: width * index, index })}
-        renderItem={({ item }) => (
-          <View style={[styles.slide, { width, height }]}>
-            <DishVideo dish={item} active={item.id === activeDishId} />
-            <View style={styles.scrim} />
+        renderItem={({ item }) => <DishVideoPage dish={item} active={item.id === activeDishId} width={width} height={height} />}
+      />
 
-            <View style={[styles.categoryRail, { top: categoryTop, left: edge, right: edge }]}>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.categoryRailContent}
-              >
-                {categories.map((category) => (
-                  <Pressable
-                    accessibilityRole="button"
-                    key={category.id}
-                    onPress={() => chooseCategory(category.id)}
-                    style={[
-                      styles.categoryButton,
-                      isPhone && styles.categoryButtonPhone,
-                      category.id === categoryId && styles.categoryButtonActive,
-                    ]}
-                  >
-                    <Text style={[styles.categoryText, isPhone && styles.categoryTextPhone]}>{category.title}</Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
-            </View>
-
-            <View style={[styles.dishRail, { top: dishTop, left: edge, right: edge }]}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dishRailContent}>
-                {visibleDishes.map((dish) => {
-                  const active = dish.id === activeDishId;
-                  return (
-                    <Pressable
-                      accessibilityRole="button"
-                      key={dish.id}
-                      onPress={() => chooseDish(dish)}
-                      style={[
-                        styles.dishButton,
-                        isPhone && styles.dishButtonPhone,
-                        active && styles.dishButtonActive,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.dishButtonTitle,
-                          isPhone && styles.dishButtonTitlePhone,
-                          active && styles.dishButtonTitleActive,
-                        ]}
-                        numberOfLines={1}
-                      >
-                        {dish.title}
-                      </Text>
-                      <Text style={[styles.dishButtonPrice, active && styles.dishButtonPriceActive]}>
-                        {formatMoney(dish.price)}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </ScrollView>
-            </View>
-
-            <View
-              style={[
-                styles.dishInfo,
-                isWideLandscape
-                  ? styles.dishInfoWide
-                  : isPortrait
-                    ? {
-                        left: edge,
-                        right: edge,
-                        bottom: portraitActionHeight + actionBottom + 18,
-                      }
-                    : {
-                        left: edge,
-                        width: "55%",
-                        bottom: isCompactLandscape ? 92 : 54,
-                      },
-              ]}
+      {activeDish ? (
+        <View pointerEvents="box-none" style={styles.fixedOverlay}>
+          <View pointerEvents="box-none" style={[styles.categoryRail, { top: categoryTop, left: edge, right: edge }]}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.categoryRailContent}
             >
-              <View style={[styles.priceBadge, isPhone && styles.priceBadgePhone]}>
-                <Text style={[styles.priceText, isPhone && styles.priceTextPhone]}>{formatMoney(item.price)}</Text>
-              </View>
-              <Text
-                style={[
-                  styles.title,
-                  isPhone ? styles.titlePhone : isPortrait || isCompactLandscape ? styles.titleCompact : null,
-                ]}
-                numberOfLines={2}
-              >
-                {item.title}
-              </Text>
-              <Text
-                style={[styles.description, isPhone && styles.descriptionPhone]}
-                numberOfLines={isPhone ? 2 : 3}
-              >
-                {item.shortDescription}
-              </Text>
-            </View>
-
-            <View
-              style={[
-                styles.actionDock,
-                isWideLandscape
-                  ? styles.actionDockWide
-                  : isPortrait
-                    ? {
-                        left: edge,
-                        right: edge,
-                        bottom: actionBottom,
-                        padding: isPhone ? 8 : 10,
-                      }
-                    : {
-                        left: edge,
-                        right: edge,
-                        bottom: actionBottom,
-                        flexDirection: "row",
-                        padding: 8,
-                      },
-              ]}
-            >
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => setDetailsDish(item)}
-                style={[styles.secondaryButton, !isWideLandscape && styles.responsiveActionButton, isPhone && styles.actionButtonPhone]}
-              >
-                <View style={styles.iconBadge}>
-                  <Info color="#ffffff" size={18} strokeWidth={2.5} />
-                </View>
-                <Text style={styles.secondaryButtonText}>Изучить</Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => setPairingDish(item)}
-                style={[styles.secondaryButton, !isWideLandscape && styles.responsiveActionButton, isPhone && styles.actionButtonPhone]}
-              >
-                <View style={styles.iconBadge}>
-                  <Sparkles color="#ffffff" size={18} strokeWidth={2.4} />
-                </View>
-                <Text style={styles.secondaryButtonText}>Подойдет</Text>
-              </Pressable>
-              {item.id === "bruschetta" ? (
+              {categories.map((category) => (
                 <Pressable
                   accessibilityRole="button"
-                  onPress={() => setModelDish(item)}
-                  style={[styles.modelButton, !isWideLandscape && styles.responsiveActionButton, isPhone && styles.actionButtonPhone]}
+                  key={category.id}
+                  onPress={() => chooseCategory(category.id)}
+                  style={[
+                    styles.categoryButton,
+                    isPhone && styles.categoryButtonPhone,
+                    category.id === categoryId && styles.categoryButtonActive,
+                  ]}
                 >
-                  <View style={styles.iconBadge}>
-                    <Box color="#151515" size={18} strokeWidth={2.4} />
-                  </View>
-                  <Text style={styles.modelButtonText}>Смотреть в 3D</Text>
+                  <Text style={[styles.categoryText, isPhone && styles.categoryTextPhone]}>{category.title}</Text>
                 </Pressable>
-              ) : null}
-            </View>
-
+              ))}
+            </ScrollView>
           </View>
-        )}
-      />
+
+          <View pointerEvents="box-none" style={[styles.dishRail, { top: dishTop, left: edge, right: edge }]}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dishRailContent}>
+              {visibleDishes.map((dish) => {
+                const active = dish.id === activeDishId;
+                return (
+                  <Pressable
+                    accessibilityRole="button"
+                    key={dish.id}
+                    onPress={() => chooseDish(dish)}
+                    style={[
+                      styles.dishButton,
+                      isPhone && styles.dishButtonPhone,
+                      active && styles.dishButtonActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.dishButtonTitle,
+                        isPhone && styles.dishButtonTitlePhone,
+                        active && styles.dishButtonTitleActive,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {dish.title}
+                    </Text>
+                    <Text style={[styles.dishButtonPrice, active && styles.dishButtonPriceActive]}>
+                      {formatMoney(dish.price)}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
+
+          <View
+            pointerEvents="none"
+            style={[
+              styles.dishInfo,
+              isWideLandscape
+                ? styles.dishInfoWide
+                : isPortrait
+                  ? { left: edge, right: edge, bottom: portraitActionHeight + actionBottom + 18 }
+                  : { left: edge, width: "55%", bottom: isCompactLandscape ? 92 : 54 },
+            ]}
+          >
+            <View style={[styles.priceBadge, isPhone && styles.priceBadgePhone]}>
+              <Text style={[styles.priceText, isPhone && styles.priceTextPhone]}>{formatMoney(activeDish.price)}</Text>
+            </View>
+            <Text
+              style={[
+                styles.title,
+                isPhone ? styles.titlePhone : isPortrait || isCompactLandscape ? styles.titleCompact : null,
+              ]}
+              numberOfLines={2}
+            >
+              {activeDish.title}
+            </Text>
+            <Text style={[styles.description, isPhone && styles.descriptionPhone]} numberOfLines={isPhone ? 2 : 3}>
+              {activeDish.shortDescription}
+            </Text>
+          </View>
+
+          <View
+            pointerEvents="box-none"
+            style={[
+              styles.actionDock,
+              isWideLandscape
+                ? styles.actionDockWide
+                : isPortrait
+                  ? { left: edge, right: edge, bottom: actionBottom, padding: isPhone ? 8 : 10 }
+                  : { left: edge, right: edge, bottom: actionBottom, flexDirection: "row", padding: 8 },
+            ]}
+          >
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setDetailsDish(activeDish)}
+              style={[styles.secondaryButton, !isWideLandscape && styles.responsiveActionButton, isPhone && styles.actionButtonPhone]}
+            >
+              <View style={styles.iconBadge}>
+                <Info color="#ffffff" size={18} strokeWidth={2.5} />
+              </View>
+              <Text adjustsFontSizeToFit minimumFontScale={0.7} numberOfLines={1} style={styles.secondaryButtonText}>Изучить</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setPairingDish(activeDish)}
+              style={[styles.secondaryButton, !isWideLandscape && styles.responsiveActionButton, isPhone && styles.actionButtonPhone]}
+            >
+              <View style={styles.iconBadge}>
+                <Sparkles color="#ffffff" size={18} strokeWidth={2.4} />
+              </View>
+              <Text adjustsFontSizeToFit minimumFontScale={0.62} numberOfLines={1} style={styles.secondaryButtonText}>Гастрономические пары</Text>
+            </Pressable>
+            {hasDishModel(activeDish.id) ? (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setModelDish(activeDish)}
+                style={[styles.modelButton, !isWideLandscape && styles.responsiveActionButton, isPhone && styles.actionButtonPhone]}
+              >
+                <View style={styles.iconBadge}>
+                  <Box color="#151515" size={18} strokeWidth={2.4} />
+                </View>
+                <Text adjustsFontSizeToFit minimumFontScale={0.7} numberOfLines={1} style={styles.modelButtonText}>Смотреть в 3D</Text>
+              </Pressable>
+            ) : (
+              <View
+                pointerEvents="none"
+                style={[
+                  styles.modelButton,
+                  styles.modelButtonPlaceholder,
+                  !isWideLandscape && styles.responsiveActionButton,
+                  isPhone && styles.actionButtonPhone,
+                ]}
+              />
+            )}
+          </View>
+        </View>
+      ) : null}
 
       <DishDetails dish={detailsDish} onClose={() => setDetailsDish(null)} />
       <PairingsModal dish={pairingDish} onClose={() => setPairingDish(null)} />
@@ -337,7 +330,7 @@ function PairingsModal({ dish, onClose }: { dish: Dish | null; onClose: () => vo
     <Modal animationType="fade" transparent visible={Boolean(dish)} onRequestClose={onClose}>
       <View style={[styles.modalBackdrop, compact && styles.modalBackdropCompact]}>
         <View style={[styles.modalPanel, compact && styles.modalPanelCompact]}>
-          <Text style={[styles.modalTitle, compact && styles.modalTitleCompact]}>К этому подойдет</Text>
+          <Text style={[styles.modalTitle, compact && styles.modalTitleCompact]}>Гастрономические пары</Text>
           {dish && dish.pairings.length > 0 ? (
             dish.pairings.map((pairing) => (
               <Text key={pairing} style={[styles.modalText, compact && styles.modalTextCompact]}>• {pairing}</Text>
@@ -361,13 +354,16 @@ function ModelViewerModal({ dish, onClose }: { dish: Dish | null; onClose: () =>
   return (
     <Modal animationType="fade" visible={Boolean(dish)} onRequestClose={onClose}>
       <View style={styles.modelViewerShell}>
-        <DishModelViewer
-          dom={{
-            contentInsetAdjustmentBehavior: "never",
-            scrollEnabled: false,
-            style: { width: "100%", height: "100%" },
-          }}
-        />
+        {dish && hasDishModel(dish.id) ? (
+          <DishModelViewer
+            dishId={dish.id}
+            dom={{
+              contentInsetAdjustmentBehavior: "never",
+              scrollEnabled: false,
+              style: { width: "100%", height: "100%" },
+            }}
+          />
+        ) : null}
         <View
           style={[
             styles.modelViewerHeader,
@@ -397,6 +393,13 @@ function ModelViewerModal({ dish, onClose }: { dish: Dish | null; onClose: () =>
 
 const styles = StyleSheet.create({
   shell: { flex: 1, backgroundColor: "#05080d" },
+  fixedOverlay: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+  },
   emptyMenu: {
     flex: 1,
     alignItems: "center",
@@ -499,7 +502,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.14)",
   },
   actionDockWide: { right: 30, bottom: 72, width: 238 },
-  responsiveActionButton: { flex: 1 },
+  responsiveActionButton: { flex: 1, minWidth: 0 },
   actionButtonPhone: { minHeight: 44, paddingHorizontal: 10 },
   secondaryButton: {
     minHeight: 52,
@@ -513,7 +516,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.18)",
   },
-  secondaryButtonText: { color: "#ffffff", fontSize: 16, fontWeight: "800" },
+  secondaryButtonText: { color: "#ffffff", flexShrink: 1, fontSize: 16, fontWeight: "800", textAlign: "center" },
   modelButton: {
     minHeight: 52,
     borderRadius: 8,
@@ -524,7 +527,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#f2c14e",
   },
-  modelButtonText: { color: "#151515", fontSize: 16, fontWeight: "900" },
+  modelButtonText: { color: "#151515", flexShrink: 1, fontSize: 16, fontWeight: "900", textAlign: "center" },
+  modelButtonPlaceholder: { opacity: 0 },
   iconBadge: {
     width: 30,
     height: 30,

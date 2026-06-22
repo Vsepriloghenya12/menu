@@ -8,7 +8,7 @@
     "server": "node server/index.cjs",
     "seed:demo": "node server/seed-demo.cjs",
     "build": "expo export --platform web",
-    "test": "node --test server/test/menu-api.test.cjs",
+    "test": "node --test server/test",
     "android": "expo start --android",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
@@ -35,10 +35,12 @@
     "react-native-screens": "latest",
     "react-native-svg": "15.15.4",
     "react-native-web": "latest",
-    "react-native-webview": "13.16.1"
+    "react-native-webview": "13.16.1",
+    "three": "^0.183.0"
   },
   "devDependencies": {
     "@types/react": "latest",
+    "@types/three": "^0.183.0",
     "typescript": "latest"
   }
 }
